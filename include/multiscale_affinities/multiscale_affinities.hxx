@@ -87,15 +87,17 @@ namespace multiscale_affinities {
 
 
     // TODO mask for valid / invalid affinities
-    template<class LABEL_ARRAY, class AFFS_ARRAY>
+    template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
     void computeMultiscaleAffinities(const xt::xexpression<LABEL_ARRAY> & labelsExp,
                                      const std::vector<int> & blockShape,
                                      xt::xexpression<AFFS_ARRAY> & affsExp,
+                                     xt::xexpression<MASK_ARRAY> & maskExp,
                                      const bool haveIgnoreLabel=false,
                                      const uint64_t ignoreLabel=0) {
 
         const auto & labels = labelsExp.derived_cast();
         auto & affs = affsExp.derived_cast();
+        auto & mask = maskExp.derived_cast();
 
         //
         // compute the block sizes and number of blocks
@@ -155,21 +157,42 @@ namespace multiscale_affinities {
                         const size_t ngbId = getBlockIndex(i - 1, j, k, blockStrides);
                         const auto & ngbHisto = histograms[ngbId];
                         const double norm = blockSize * blockSizes[ngbId];
-                        affs(0, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                        if(norm > 0) {
+                            affs(0, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                            mask(0, i, j, k) = 1;
+                        } else {
+                            mask(0, i, j, k) = 0;
+                        }
+                    } else {
+                        mask(0, i, j, k) = 0;
                     }
 
                     if(j > 0) {
                         const size_t ngbId = getBlockIndex(i, j - 1, k, blockStrides);
                         const auto & ngbHisto = histograms[ngbId];
                         const double norm = blockSize * blockSizes[ngbId];
-                        affs(1, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                        if(norm > 0) {
+                            affs(1, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                            mask(1, i, j, k) = 1;
+                        } else {
+                            mask(1, i, j, k) = 0;
+                        }
+                    } else {
+                        mask(1, i, j, k) = 0;
                     }
 
                     if(k > 0) {
                         const size_t ngbId = getBlockIndex(i, j, k - 1, blockStrides);
                         const auto & ngbHisto = histograms[ngbId];
                         const double norm =  blockSize * blockSizes[ngbId];
-                        affs(2, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                        if(norm > 0) {
+                            affs(2, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
+                            mask(2, i, j, k) = 1;
+                        } else {
+                            mask(2, i, j, k) = 0;
+                        }
+                    } else {
+                        mask(2, i, j, k) = 0;
                     }
 
                 }

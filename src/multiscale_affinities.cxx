@@ -40,10 +40,16 @@ PYBIND11_MODULE(multiscale_affinities, m)
 
             // allocate the output
             xt::pytensor<float, 4> affs(outShape);
+            xt::pytensor<uint8_t, 4> mask(outShape);
             {
                 py::gil_scoped_release allowThreads;
-                multiscale_affinities::computeMultiscaleAffinities(labels, blockShape, affs, haveIgnoreLabel, ignoreLabel);
+                multiscale_affinities::computeMultiscaleAffinities(labels, blockShape,
+                                                                   affs, mask,
+                                                                   haveIgnoreLabel, ignoreLabel);
             }
-            return affs;
-        },py::arg("labels"), py::arg("samplingFactors"), py::arg("haveIgnoreLabel")=false, py::arg("ignoreLabel")=0);
+            return std::make_pair(affs, mask);
+        }, py::arg("labels"),
+           py::arg("samplingFactors"),
+           py::arg("haveIgnoreLabel")=false,
+           py::arg("ignoreLabel")=0);
 }

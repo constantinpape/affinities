@@ -23,7 +23,7 @@ def ms_affs_cremi():
     # print('Ms affs python in', time.time() - t0)
 
     t1 = time.time()
-    ms_affs = compute_multiscale_affinities(gt, sampling_factors)
+    ms_affs, mask = compute_multiscale_affinities(gt, sampling_factors)
     print("Ms affs in", time.time() - t1)
 
     # assert ms_affs.shape == ms_affs_py.shape, "%s, %s" % (str(ms_affs.shape), str(ms_affs_py.shape))
@@ -32,11 +32,12 @@ def ms_affs_cremi():
         raw = f['volumes/raw'][bb].astype('float32')
 
     new_shape = ms_affs.shape[1:]
+    mask = (1. - mask).astype('uint32')
     raw = vigra.sampling.resize(raw, new_shape)
     # view([raw, ms_affs.transpose((1, 2, 3, 0)), ms_affs_py.transpose((1, 2, 3, 0))],
     #      ['raw', 'ms-affs-cpp', 'ms-affs-py'])
-    view([raw, ms_affs.transpose((1, 2, 3, 0))],
-         ['raw', 'ms-affs-cpp'])
+    view([raw, ms_affs.transpose((1, 2, 3, 0)), mask.transpose((1, 2, 3, 0))],
+         ['raw', 'ms-affs-cpp', 'mask'])
 
 
 if __name__ == '__main__':
