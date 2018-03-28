@@ -13,10 +13,11 @@ namespace multiscale_affinities {
 
 
     template<class LABELS>
-    inline void computeHistogram(const LABELS & labels,
-                                 const Coordinate & blockBegin,
-                                 const Coordinate & blockEnd,
-                                 Histogram & out) {
+    inline size_t computeHistogram(const LABELS & labels,
+                                   const Coordinate & blockBegin,
+                                   const Coordinate & blockEnd,
+                                   Histogram & out) {
+        size_t nPixels = 0;
         for(size_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
             for(size_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
                 for(size_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
@@ -28,9 +29,41 @@ namespace multiscale_affinities {
                     } else {
                         ++outIt->second;
                     }
+                    ++nPixels;
                 }
             }
         }
+        return nPixels;
+    }
+
+
+    template<class LABELS>
+    inline size_t computeHistogramWithIgnoreLabel(const LABELS & labels,
+                                                  const Coordinate & blockBegin,
+                                                  const Coordinate & blockEnd,
+                                                  Histogram & out,
+                                                  const uint64_t ignoreLabel) {
+        size_t nPixels = 0;
+        for(size_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
+            for(size_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
+                for(size_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
+                    //
+                    const uint64_t label = labels(z, y, x);
+                    if(label == ignoreLabel) {
+                        continue;
+                    }
+
+                    auto outIt = out.find(label);
+                    if(outIt == out.end()) {
+                        out.insert(outIt, std::make_pair(label, 1));
+                    } else {
+                        ++outIt->second;
+                    }
+                    ++nPixels;
+                }
+            }
+        }
+        return nPixels;
     }
 
 
@@ -57,7 +90,9 @@ namespace multiscale_affinities {
     template<class LABEL_ARRAY, class AFFS_ARRAY>
     void computeMultiscaleAffinities(const xt::xexpression<LABEL_ARRAY> & labelsExp,
                                      const std::vector<int> & blockShape,
-                                     xt::xexpression<AFFS_ARRAY> & affsExp) {
+                                     xt::xexpression<AFFS_ARRAY> & affsExp,
+                                     const bool haveIgnoreLabel=false,
+                                     const uint64_t ignoreLabel=0) {
 
         const auto & labels = labelsExp.derived_cast();
         auto & affs = affsExp.derived_cast();
@@ -92,10 +127,14 @@ namespace multiscale_affinities {
                     Coordinate blockEnd = {std::min((i + 1) * blockShape[0], shape[0]),
                                            std::min((j + 1) * blockShape[1], shape[1]),
                                            std::min((k + 1) * blockShape[2], shape[2])};
-                    computeHistogram(labels, blockBegin, blockEnd, histograms[blockId]);
+
                     size_t & blockSize = blockSizes[blockId];
-                    for(unsigned d = 0; d < 3; ++d) {
-                        blockSize *= blockEnd[d] - blockBegin[d];
+                    if(haveIgnoreLabel){
+                        blockSize = computeHistogramWithIgnoreLabel(labels, blockBegin, blockEnd,
+                                                                    histograms[blockId], ignoreLabel);
+                    }
+                    else {
+                        blockSize = computeHistogram(labels, blockBegin, blockEnd, histograms[blockId]);
                     }
                 }
             }
@@ -129,7 +168,7 @@ namespace multiscale_affinities {
                     if(k > 0) {
                         const size_t ngbId = getBlockIndex(i, j, k - 1, blockStrides);
                         const auto & ngbHisto = histograms[ngbId];
-                        const double norm = blockSize * blockSizes[ngbId];
+                        const double norm =  blockSize * blockSizes[ngbId];
                         affs(2, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
                     }
 

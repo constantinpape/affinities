@@ -25,7 +25,9 @@ PYBIND11_MODULE(multiscale_affinities, m)
 
     // TODO mask for valid / invalid affinities ?!
     m.def("compute_multiscale_affinities", [](const xt::pytensor<uint64_t, 3> & labels,
-                                              const std::vector<int> & blockShape) {
+                                              const std::vector<int> & blockShape,
+                                              const bool haveIgnoreLabel,
+                                              const uint64_t ignoreLabel) {
             // compute the out shape
             typedef typename xt::pytensor<float, 4>::shape_type ShapeType;
             const auto & shape = labels.shape();
@@ -40,8 +42,8 @@ PYBIND11_MODULE(multiscale_affinities, m)
             xt::pytensor<float, 4> affs(outShape);
             {
                 py::gil_scoped_release allowThreads;
-                multiscale_affinities::computeMultiscaleAffinities(labels, blockShape, affs);
+                multiscale_affinities::computeMultiscaleAffinities(labels, blockShape, affs, haveIgnoreLabel, ignoreLabel);
             }
             return affs;
-        },py::arg("labels"), py::arg("samplingFactors"));
+        },py::arg("labels"), py::arg("samplingFactors"), py::arg("haveIgnoreLabel")=false, py::arg("ignoreLabel")=0);
 }
