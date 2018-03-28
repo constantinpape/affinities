@@ -39,8 +39,8 @@ class get_numpy_include(object):
 
 ext_modules = [
     Extension(
-        'multiscale_affinities',
-        ['src/multiscale_affinities.cxx'],
+        'affinities',
+        ['src/affinities.cxx'],
         include_dirs=[
             # Path to pybind11 headers
             get_pybind_include(),
@@ -105,12 +105,12 @@ class BuildExt(build_ext):
 
 
 setup(
-    name='multiscale_affinities',
+    name='affinities',
     version=__version__,
     author='Constantin Pape',
     author_email='constantin.pape@iwr.uni-heidelberg.de',
-    url='https://github.com/inferno/multiscale_affinities',
-    description='Fast computation of multi-scale affinities',
+    url='https://github.com/inferno/affinities',
+    description='Fast computation of affinities and multi-scale affinities',
     long_description='',
     ext_modules=ext_modules,
     install_requires=['pybind11>=2.0.1', 'numpy'],

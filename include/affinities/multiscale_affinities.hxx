@@ -4,10 +4,10 @@
 #include "xtensor/xtensor.hpp"
 
 
-namespace multiscale_affinities {
+namespace affinities {
 
     // typedefs
-    typedef std::array<size_t, 3> Coordinate;
+    typedef std::array<int64_t, 3> Coordinate;
     typedef std::unordered_map<uint64_t, size_t> Histogram;
     typedef std::vector<Histogram> HistogramStorage;
 
@@ -18,9 +18,9 @@ namespace multiscale_affinities {
                                    const Coordinate & blockEnd,
                                    Histogram & out) {
         size_t nPixels = 0;
-        for(size_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
-            for(size_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                for(size_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
+        for(int64_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
+            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
+                for(int64_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
                     //
                     const uint64_t label = labels(z, y, x);
                     auto outIt = out.find(label);
@@ -44,9 +44,9 @@ namespace multiscale_affinities {
                                                   Histogram & out,
                                                   const uint64_t ignoreLabel) {
         size_t nPixels = 0;
-        for(size_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
-            for(size_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                for(size_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
+        for(int64_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
+            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
+                for(int64_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
                     //
                     const uint64_t label = labels(z, y, x);
                     if(label == ignoreLabel) {
@@ -86,7 +86,6 @@ namespace multiscale_affinities {
     }
 
 
-    // TODO mask for valid / invalid affinities
     template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
     void computeMultiscaleAffinities(const xt::xexpression<LABEL_ARRAY> & labelsExp,
                                      const std::vector<int> & blockShape,
@@ -119,9 +118,9 @@ namespace multiscale_affinities {
         //
         HistogramStorage histograms(numberOfBlocks);
         std::vector<size_t> blockSizes(numberOfBlocks, 1);
-        for(size_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(size_t j = 0; j < blocksPerAxis[1]; ++j) {
-                for(size_t k = 0; k < blocksPerAxis[2]; ++k) {
+        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
+            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
+                for(int64_t k = 0; k < blocksPerAxis[2]; ++k) {
                     const size_t blockId = getBlockIndex(i, j, k, blockStrides);
                     Coordinate blockBegin = {i * blockShape[0],
                                              j * blockShape[1],
@@ -145,9 +144,9 @@ namespace multiscale_affinities {
         //
         // compute the affinties
         //
-        for(size_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(size_t j = 0; j < blocksPerAxis[1]; ++j) {
-                for(size_t k = 0; k < blocksPerAxis[2]; ++k) {
+        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
+            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
+                for(int64_t k = 0; k < blocksPerAxis[2]; ++k) {
 
                     const size_t blockId = getBlockIndex(i, j, k, blockStrides);
                     const auto & histo = histograms[blockId];
