@@ -31,7 +31,7 @@ namespace affinities {
             for(int64_t j = 0; j < shape[1]; ++j) {
                 for(int64_t k = 0; k < shape[2]; ++k) {
                     // declare histograms
-                    Histogram hist, ngb;
+                    Histogram hist;
 
                     // define central block
                     // TODO how to handle out of range
@@ -65,8 +65,8 @@ namespace affinities {
                     }
 
                     for(unsigned d = 0; d < 3; ++d) {
-                        ngb.clear();
-                        // compute affinity to i-neighbor block
+                        // compute affinity to d-neighbor block
+                        Histogram ngb;
                         Coordinate ngbBegin = blockBegin;
                         Coordinate ngbEnd = blockEnd;
 
@@ -81,11 +81,11 @@ namespace affinities {
                         // compute neighboring histogram
                         size_t ngbSize;
                         if(haveIgnoreLabel){
-                            ngbSize = computeHistogramWithIgnoreLabel(labels, blockBegin, blockEnd,
+                            ngbSize = computeHistogramWithIgnoreLabel(labels, ngbBegin, ngbEnd,
                                                                       ngb, ignoreLabel);
                         }
                         else {
-                            ngbSize = computeHistogram(labels, blockBegin, blockEnd, ngb);
+                            ngbSize = computeHistogram(labels, ngbBegin, ngbEnd, ngb);
                         }
 
                         // if the block size is zero (due to masking), mask these affinities and continue
