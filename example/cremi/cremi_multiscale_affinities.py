@@ -45,18 +45,16 @@ def ms_fs_affs_cremi():
 
     path = '/home/papec/Work/neurodata_hdd/cremi/sample_A_20160501.hdf'
     bb = np.s_[:50, :512, :512]
+    # bb = np.s_[:50, :256, :256]
     with h5py.File(path, 'r') as f:
         gt = f['volumes/labels/neuron_ids'][bb]
 
-    sampling_factors = [3, 9, 9]
+    sampling_factors = [3, 27, 27]
     # sampling_factors = [1, 3, 3]
 
     t1 = time.time()
     ms_affs, mask = compute_fullscale_multiscale_affinities(gt, sampling_factors)
     print("Ms affs in", time.time() - t1)
-    print(np.sum(ms_affs))
-    print(np.sum(ms_affs) / ms_affs.size)
-    have_aff = (ms_affs > 0).astype('uint32')
 
     with h5py.File(path, 'r') as f:
         raw = f['volumes/raw'][bb].astype('float32')
@@ -64,8 +62,8 @@ def ms_fs_affs_cremi():
     new_shape = ms_affs.shape[1:]
     mask = (1. - mask).astype('uint32')
     raw = vigra.sampling.resize(raw, new_shape)
-    view([raw, ms_affs.transpose((1, 2, 3, 0)), mask.transpose((1, 2, 3, 0)), have_aff.transpose((1, 2, 3, 0))],
-         ['raw', 'ms-affs', 'mask', 'abc'])
+    view([raw, gt, ms_affs.transpose((1, 2, 3, 0)), mask.transpose((1, 2, 3, 0))],
+         ['raw', 'gt', 'ms-affs', 'mask'])
 
 
 if __name__ == '__main__':
