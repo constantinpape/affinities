@@ -44,7 +44,7 @@ def ms_affs_cremi():
 def ms_fs_affs_cremi():
 
     path = '/home/papec/Work/neurodata_hdd/cremi/sample_A_20160501.hdf'
-    bb = np.s_[:50, :512, :512]
+    bb = np.s_[:60, :512, :512]
     # bb = np.s_[:50, :256, :256]
     with h5py.File(path, 'r') as f:
         gt = f['volumes/labels/neuron_ids'][bb]

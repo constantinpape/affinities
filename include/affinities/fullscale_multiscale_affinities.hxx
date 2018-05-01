@@ -15,19 +15,19 @@ namespace affinities {
         auto & mask = maskExp.derived_cast();
 
         // get the shape
-        Coordinate shape;
+        Coordinate3D shape;
         for(unsigned d = 0; d < 3; ++d) {
             shape[d] = labels.shape()[d];
         }
 
         // get the strides
-        const Coordinate strides = {shape[1] * shape[2], shape[2], 1};
+        const Coordinate3D strides = {shape[1] * shape[2], shape[2], 1};
 
         // compute the half block shape
         // this assumes that block shapes are odd,
         // to have the pixel in the middle of the block.
         // otherwise the pixel will be misaligned
-        Coordinate blockLens;
+        Coordinate3D blockLens;
         for(unsigned d = 0; d < 3; ++d) {
             blockLens[d] = blockShape[d] / 2;
         }
@@ -40,7 +40,7 @@ namespace affinities {
         std::vector<size_t> blockSizes(numberOfPixels, 0);
 
         // compute histogram for each pixel
-        Coordinate blockBegin, blockEnd, coord;
+        Coordinate3D blockBegin, blockEnd, coord;
         for(int64_t i = 0; i < shape[0]; ++i) {
             for(int64_t j = 0; j < shape[1]; ++j) {
                 for(int64_t k = 0; k < shape[2]; ++k) {
@@ -99,13 +99,13 @@ namespace affinities {
                         continue;
                     }
                     const auto & hist = histograms[pixId];
-                    const Coordinate coord = {i, j, k};
+                    const Coordinate3D coord = {i, j, k};
 
                     // compute affinity to neighbor blocks
                     for(unsigned d = 0; d < 3; ++d) {
 
                         // get the neighbor coordinate
-                        Coordinate ngbCoord = coord;
+                        Coordinate3D ngbCoord = coord;
                         ngbCoord[d] -= 1;
 
                         // check if the neighbor coordinate is valid

@@ -4,22 +4,37 @@ import numpy as np
 
 class AffinitiesTest(unittest.TestCase):
 
-    def testaffs(self):
+    def test_affs_2d(self):
         import affinities
-        shape = (100, 100, 100)
+        shape = (100, 100)
         labels = np.random.randint(0, 100, size=shape)
-        offsets = [[-1, 0, 0], [0, -1, 0], [0, 0, -1],
-                   [-5, 0, 0], [0, -5, 0], [0, 0, -5],
-                   [10, 10, 10], [3, 9, 27], [0, 9, 8]]
+        offsets = [[-1, 0], [0, -1],
+                   [-5, 0], [0, -5],
+                   [10, 10], [3, 9]]
 
-        affs, mask = affinities.compute_affinities(labels, offsets)
+        affs, mask = affinities.compute_affinities_2d(labels, offsets)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)
         self.assertNotEqual(np.sum(affs == 0), 0)
         self.assertNotEqual(np.sum(mask == 0), 0)
 
-    def test_affs_ignore(self):
+    def test_affs_ignore_2d(self):
+        import affinities
+        shape = (100, 100)
+        labels = np.random.randint(0, 100, size=shape)
+        offsets = [[-1, 0], [0, -1],
+                   [-5, 0], [0, -5],
+                   [10, 10], [3, 9]]
+
+        affs, mask = affinities.compute_affinities_2d(labels, offsets, True)
+        expected_shape = (len(offsets),) + labels.shape
+        self.assertEqual(affs.shape, expected_shape)
+        self.assertEqual(mask.shape, expected_shape)
+        self.assertNotEqual(np.sum(affs == 0), 0)
+        self.assertNotEqual(np.sum(mask == 0), 0)
+
+    def test_affs_3d(self):
         import affinities
         shape = (100, 100, 100)
         labels = np.random.randint(0, 100, size=shape)
@@ -27,7 +42,22 @@ class AffinitiesTest(unittest.TestCase):
                    [-5, 0, 0], [0, -5, 0], [0, 0, -5],
                    [10, 10, 10], [3, 9, 27], [0, 9, 8]]
 
-        affs, mask = affinities.compute_affinities(labels, offsets, True)
+        affs, mask = affinities.compute_affinities_3d(labels, offsets)
+        expected_shape = (len(offsets),) + labels.shape
+        self.assertEqual(affs.shape, expected_shape)
+        self.assertEqual(mask.shape, expected_shape)
+        self.assertNotEqual(np.sum(affs == 0), 0)
+        self.assertNotEqual(np.sum(mask == 0), 0)
+
+    def test_affs_ignore_3d(self):
+        import affinities
+        shape = (100, 100, 100)
+        labels = np.random.randint(0, 100, size=shape)
+        offsets = [[-1, 0, 0], [0, -1, 0], [0, 0, -1],
+                   [-5, 0, 0], [0, -5, 0], [0, 0, -5],
+                   [10, 10, 10], [3, 9, 27], [0, 9, 8]]
+
+        affs, mask = affinities.compute_affinities_3d(labels, offsets, True)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)

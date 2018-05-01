@@ -113,7 +113,7 @@ setup(
     description='Fast computation of affinities and multi-scale affinities',
     long_description='',
     ext_modules=ext_modules,
-    install_requires=['pybind11>=2.0.1', 'numpy'],
+    install_requires=['pybind11>=2.0.1', 'numpy', 'xtensor-python'],
     cmdclass={'build_ext': BuildExt},
     zip_safe=False,
 )
