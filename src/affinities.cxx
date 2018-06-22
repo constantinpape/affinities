@@ -3,8 +3,10 @@
 
 #define FORCE_IMPORT_ARRAY
 #include "xtensor-python/pytensor.hpp"
+#include "xtensor-python/pyarray.hpp"
 
 #include "affinities/affinities.hxx"
+#include "affinities/connected_components.hxx"
 #include "affinities/malis.hxx"
 #include "affinities/multiscale_affinities.hxx"
 #include "affinities/fullscale_multiscale_affinities.hxx"
@@ -177,21 +179,37 @@ PYBIND11_MODULE(affinities, m)
 
 
     // TODO use constrained malis once implemented
-    m.def("compute_mals_2d", [](const xt::pytensor<float, 3> & affinities,
-                                const xt::pytensor<uint64_t, 2> & labels,
-                                const std::vector<std::vector<int>> & offsets) {
-            // 
-            const auto & affShape = affinities.shape();
-            double loss;
-            xt::pytensor<float, 3> gradients(affShape);
-            {
-                py::gil_scoped_release allowThreads;
-                loss = affinities::malis_gradient(affinities, labels,
-                                                  gradients, offsets, true);
-            }
-            return std::make_pair(loss, gradients);
+    m.def("compute_malis_2d", [](const xt::pytensor<float, 3> & affinities,
+                                 const xt::pytensor<uint64_t, 2> & labels,
+                                 const std::vector<std::vector<int>> & offsets) {
+        //
+        const auto & affShape = affinities.shape();
+        double loss;
+        xt::pytensor<float, 3> gradients(affShape);
+        {
+            py::gil_scoped_release allowThreads;
+            loss = affinities::malis_gradient(affinities, labels,
+                                              gradients, offsets, true);
+        }
+        return std::make_pair(loss, gradients);
     }, py::arg("affinities"),
        py::arg("labels"),
        py::arg("offsets"));
+
+
+    m.def("connected_components", [](const xt::pyarray<float> & affinities,
+                                     const float threshold) {
+        typedef xt::pyarray<uint64_t>::shape_type ShapeType;
+        ShapeType shape(affinities.shape().begin() + 1, affinities.shape().end());
+        xt::pyarray<uint64_t> labels = xt::zeros<uint64_t>(shape);
+        size_t max_label;
+        {
+            py::gil_scoped_release allowThreads;
+            max_label = affinities::connected_components(affinities, labels, threshold);
+        }
+        return std::make_pair(labels, max_label);
+    }, py::arg("affinities"),
+       py::arg("threshold")
+    );
 
 }
