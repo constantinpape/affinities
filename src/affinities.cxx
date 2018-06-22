@@ -5,6 +5,7 @@
 #include "xtensor-python/pytensor.hpp"
 
 #include "affinities/affinities.hxx"
+#include "affinities/malis.hxx"
 #include "affinities/multiscale_affinities.hxx"
 #include "affinities/fullscale_multiscale_affinities.hxx"
 
@@ -173,4 +174,24 @@ PYBIND11_MODULE(affinities, m)
            py::arg("offset"),
            py::arg("haveIgnoreLabel")=false,
            py::arg("ignoreLabel")=0);
+
+
+    // TODO use constrained malis once implemented
+    m.def("compute_mals_2d", [](const xt::pytensor<float, 3> & affinities,
+                                const xt::pytensor<uint64_t, 2> & labels,
+                                const std::vector<std::vector<int>> & offsets) {
+            // 
+            const auto & affShape = affinities.shape();
+            double loss;
+            xt::pytensor<float, 3> gradients(affShape);
+            {
+                py::gil_scoped_release allowThreads;
+                loss = affinities::malis_gradient(affinities, labels,
+                                                  gradients, offsets, true);
+            }
+            return std::make_pair(loss, gradients);
+    }, py::arg("affinities"),
+       py::arg("labels"),
+       py::arg("offsets"));
+
 }
