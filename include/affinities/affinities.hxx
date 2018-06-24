@@ -1,130 +1,84 @@
 #pragma once
 #include <unordered_map>
 #include <vector>
+
 #include "xtensor/xtensor.hpp"
+#include "xt_util/xt_util.hxx"
 
 
 namespace affinities {
 
-    typedef std::array<int64_t, 3> Coordinate3D;
-    typedef std::array<int64_t, 2> Coordinate2D;
+    template<class LABELS, class AFFS, class MASK>
+    void compute_affinities(const xt::xexpression<LABELS> & labels_exp,
+                            const std::vector<std::vector<int>> & offsets,
+                            xt::xexpression<AFFS> & affs_exp,
+                            xt::xexpression<MASK> & mask_exp,
+                            const bool have_ignore_label=false,
+                            const uint64_t ignore_label=0) {
+        const auto & labels = labels_exp.derived_cast();
+        auto & affs = affs_exp.derived_cast();
+        auto & mask = mask_exp.derived_cast();
 
-    template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
-    void computeAffinities3D(const xt::xexpression<LABEL_ARRAY> & labelsExp,
-                             const std::vector<std::array<int, 3>> & offsets,
-                             xt::xexpression<AFFS_ARRAY> & affsExp,
-                             xt::xexpression<MASK_ARRAY> & maskExp,
-                             const bool haveIgnoreLabel=false,
-                             const uint64_t ignoreLabel=0) {
-        const auto & labels = labelsExp.derived_cast();
-        auto & affs = affsExp.derived_cast();
-        auto & mask = maskExp.derived_cast();
+        typedef typename AFFS::value_type AffinityType;
+        typedef typename LABELS::value_type LabelType;
 
-        typedef typename AFFS_ARRAY::value_type AffinityType;
+        // get the number of dimensions, and the shapes of
+        // labels and affinities
+        const unsigned ndim = labels.dimension();
+        const xt::xindex shape(labels.shape().begin(), labels.shape().end());
+        // check that dimensions agree
+        if(ndim + 1 != affs.dimension()) {
+            throw std::runtime_error("Dimensions of labels and affinities do not agree.");
+        }
+        // affinity shape
+        const xt::xindex aff_shape(affs.shape().begin(), affs.shape().end());
+        // TODO check shapes !
 
-        const Coordinate3D shape = {labels.shape()[0],
-                                    labels.shape()[1],
-                                    labels.shape()[2]};
-        const int64_t nChannels = offsets.size();
+        const int64_t n_channels = offsets.size();
+        // check that number of channels do agree
+        if(n_channels != aff_shape[0]) {
+            throw std::runtime_error("Number of channels in affinities and offsets do not agree.");
+        }
 
-        // TODO I don't know if it matters terribly much, but in terms of
-        // cache locality, this iteration order seems to be not really optimal,
-        // because we iterate over the complete label image `nChannels` times
-        for(int64_t c = 0; c < nChannels; ++c) {
-            for(int64_t i = 0; i < shape[0]; ++i) {
-                for(int64_t j = 0; j < shape[1]; ++j) {
-                    for(int64_t k = 0; k < shape[2]; ++k) {
+        // initialize coordinates
+        xt::xindex coord(ndim), ngb_coord(ndim);
 
-                        Coordinate3D ngb = {i, j, k};
-                        const auto & offset = offsets[c];
+        // get the affinity and mask value for each affinity coordinate
+        xt_util::for_each_coordinate(aff_shape, [&](const xt::xindex & aff_coord){
 
-                        bool outOfRange = false;
-                        for(unsigned d = 0; d < 3; ++d) {
-                            ngb[d] += offset[d];
-                            if(ngb[d] < 0 || ngb[d] >= shape[d]) {
-                                outOfRange = true;
-                                mask(c, i, j, k) = 0;
-                                break;
-                            }
-                        }
+            // set the spatial coordinates
+            std::copy(aff_coord.begin() + 1, aff_coord.end(), coord.begin());
+            ngb_coord = coord;
+            // set the spatial coords from the offsets
+            const auto & offset = offsets[aff_coord[0]];
 
-                        if(outOfRange) {
-                            continue;
-                        }
-
-                        const uint64_t label = labels(i, j, k);
-                        const uint64_t labelNgb = labels(ngb[0], ngb[1], ngb[2]);
-
-                        if(haveIgnoreLabel) {
-                            if(label == ignoreLabel || labelNgb == ignoreLabel) {
-                                mask(c, i, j, k) = 0;
-                                continue;
-                            }
-                        }
-
-                        affs(c, i, j, k) = static_cast<AffinityType>(label == labelNgb);
-                        mask(c, i, j, k) = 1;
-                    }
+            bool out_of_range = false;
+            for(unsigned d = 0; d < ndim; ++d) {
+                ngb_coord[d] += offset[d];
+                if(ngb_coord[d] < 0 || ngb_coord[d] >= shape[d]) {
+                    out_of_range = true;
+                    mask[aff_coord] = 0;
+                    break;
                 }
             }
-        }
-    }
 
+            if(out_of_range) {
+                return;
+            }
 
-    template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
-    void computeAffinities2D(const xt::xexpression<LABEL_ARRAY> & labelsExp,
-                             const std::vector<std::array<int, 2>> & offsets,
-                             xt::xexpression<AFFS_ARRAY> & affsExp,
-                             xt::xexpression<MASK_ARRAY> & maskExp,
-                             const bool haveIgnoreLabel=false,
-                             const uint64_t ignoreLabel=0) {
-        const auto & labels = labelsExp.derived_cast();
-        auto & affs = affsExp.derived_cast();
-        auto & mask = maskExp.derived_cast();
+            const LabelType label = labels[coord];
+            const LabelType label_ngb = labels[ngb_coord];
 
-        typedef typename AFFS_ARRAY::value_type AffinityType;
-
-        const Coordinate2D shape = {labels.shape()[0],
-                                    labels.shape()[1]};
-        const int64_t nChannels = offsets.size();
-
-        // TODO I don't know if it matters terribly much, but in terms of
-        // cache locality, this iteration order seems to be not really optimal,
-        // because we iterate over the complete label image `nChannels` times
-        for(int64_t c = 0; c < nChannels; ++c) {
-            for(int64_t i = 0; i < shape[0]; ++i) {
-                for(int64_t j = 0; j < shape[1]; ++j) {
-                    Coordinate2D ngb = {i, j};
-                    const auto & offset = offsets[c];
-
-                    bool outOfRange = false;
-                    for(unsigned d = 0; d < 2; ++d) {
-                        ngb[d] += offset[d];
-                        if(ngb[d] < 0 || ngb[d] >= shape[d]) {
-                            outOfRange = true;
-                            mask(c, i, j) = 0;
-                            break;
-                        }
-                    }
-
-                    if(outOfRange) {
-                        continue;
-                    }
-
-                    const uint64_t label = labels(i, j);
-                    const uint64_t labelNgb = labels(ngb[0], ngb[1]);
-
-                    if(haveIgnoreLabel) {
-                        if(label == ignoreLabel || labelNgb == ignoreLabel) {
-                            mask(c, i, j) = 0;
-                            continue;
-                        }
-                    }
-
-                    affs(c, i, j) = static_cast<AffinityType>(label == labelNgb);
-                    mask(c, i, j) = 1;
+            if(have_ignore_label) {
+                if(label == ignore_label || label_ngb == ignore_label) {
+                    mask[aff_coord] = 0;
+                    return;
                 }
             }
-        }
+
+            affs[aff_coord] = static_cast<AffinityType>(label == label_ngb);
+            mask[aff_coord] = 1;
+        });
     }
+
 }

@@ -12,7 +12,7 @@ class AffinitiesTest(unittest.TestCase):
                    [-5, 0], [0, -5],
                    [10, 10], [3, 9]]
 
-        affs, mask = affinities.compute_affinities_2d(labels, offsets)
+        affs, mask = affinities.compute_affinities(labels, offsets)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)
@@ -27,7 +27,7 @@ class AffinitiesTest(unittest.TestCase):
                    [-5, 0], [0, -5],
                    [10, 10], [3, 9]]
 
-        affs, mask = affinities.compute_affinities_2d(labels, offsets, True)
+        affs, mask = affinities.compute_affinities(labels, offsets, True)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)
@@ -42,7 +42,7 @@ class AffinitiesTest(unittest.TestCase):
                    [-5, 0, 0], [0, -5, 0], [0, 0, -5],
                    [10, 10, 10], [3, 9, 27], [0, 9, 8]]
 
-        affs, mask = affinities.compute_affinities_3d(labels, offsets)
+        affs, mask = affinities.compute_affinities(labels, offsets)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)
@@ -57,7 +57,7 @@ class AffinitiesTest(unittest.TestCase):
                    [-5, 0, 0], [0, -5, 0], [0, 0, -5],
                    [10, 10, 10], [3, 9, 27], [0, 9, 8]]
 
-        affs, mask = affinities.compute_affinities_3d(labels, offsets, True)
+        affs, mask = affinities.compute_affinities(labels, offsets, True)
         expected_shape = (len(offsets),) + labels.shape
         self.assertEqual(affs.shape, expected_shape)
         self.assertEqual(mask.shape, expected_shape)

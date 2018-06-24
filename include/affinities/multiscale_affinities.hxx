@@ -2,129 +2,69 @@
 #include <unordered_map>
 #include <vector>
 #include "xtensor/xtensor.hpp"
+#include "xt_util/xt_util.hxx"
 
 
 namespace affinities {
 
     // typedefs
-    typedef std::array<int64_t, 2> Coordinate2D;
-    typedef std::array<int64_t, 3> Coordinate3D;
     typedef std::unordered_map<uint64_t, size_t> Histogram;
     typedef std::vector<Histogram> HistogramStorage;
 
 
-    template<class LABELS>
-    inline size_t computeHistogram(const LABELS & labels,
-                                   const Coordinate3D & blockBegin,
-                                   const Coordinate3D & blockEnd,
-                                   Histogram & out) {
-        size_t nPixels = 0;
-        for(int64_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
-            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                for(int64_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
-                    //
-                    const uint64_t label = labels(z, y, x);
-                    auto outIt = out.find(label);
-                    if(outIt == out.end()) {
-                        out.insert(outIt, std::make_pair(label, 1));
-                    } else {
-                        ++outIt->second;
-                    }
-                    ++nPixels;
-                }
+    template<class LABELS, class COORD>
+    inline size_t compute_histogram(const LABELS & labels,
+                                    const COORD & block_begin,
+                                    const COORD & block_end,
+                                    Histogram & out) {
+        typedef typename LABELS::value_type LabelType;
+        size_t n_pixels = 0;
+        xt_util::for_each_coordinate(block_begin, block_end, [&](const xt::xindex & coord){
+            const LabelType label = labels[coord];
+            auto out_it = out.find(label);
+            if(out_it == out.end()) {
+                out.insert(out_it, std::make_pair(label, 1));
+            } else {
+                ++out_it->second;
             }
-        }
-        return nPixels;
+            ++n_pixels;
+        });
+        return n_pixels;
     }
 
 
-    template<class LABELS>
-    inline size_t computeHistogram(const LABELS & labels,
-                                   const Coordinate2D & blockBegin,
-                                   const Coordinate2D & blockEnd,
-                                   Histogram & out) {
-        size_t nPixels = 0;
-        for(int64_t x = blockBegin[0]; x < blockEnd[0]; ++x) {
-            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                //
-                const uint64_t label = labels(x, y);
-                auto outIt = out.find(label);
-                if(outIt == out.end()) {
-                    out.insert(outIt, std::make_pair(label, 1));
-                } else {
-                    ++outIt->second;
-                }
-                ++nPixels;
+    template<class LABELS, class COORD>
+    inline size_t compute_histogram_with_ignore_label(const LABELS & labels,
+                                                      const COORD & block_begin,
+                                                      const COORD & block_end,
+                                                      Histogram & out,
+                                                      const uint64_t ignore_label) {
+        typedef typename LABELS::value_type LabelType;
+        size_t n_pixels = 0;
+        xt_util::for_each_coordinate(block_begin, block_end, [&](const xt::xindex & coord){
+            const uint64_t label = labels[coord];
+            if(label == ignore_label) {
+                return;
             }
-        }
-        return nPixels;
+
+            auto out_it = out.find(label);
+            if(out_it == out.end()) {
+                out.insert(out_it, std::make_pair(label, 1));
+            } else {
+                ++out_it->second;
+            }
+            ++n_pixels;
+        });
+        return n_pixels;
     }
 
 
-    template<class LABELS>
-    inline size_t computeHistogramWithIgnoreLabel(const LABELS & labels,
-                                                  const Coordinate3D & blockBegin,
-                                                  const Coordinate3D & blockEnd,
-                                                  Histogram & out,
-                                                  const uint64_t ignoreLabel) {
-        size_t nPixels = 0;
-        for(int64_t z = blockBegin[0]; z < blockEnd[0]; ++z) {
-            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                for(int64_t x = blockBegin[2]; x < blockEnd[2]; ++x) {
-                    //
-                    const uint64_t label = labels(z, y, x);
-                    if(label == ignoreLabel) {
-                        continue;
-                    }
-
-                    auto outIt = out.find(label);
-                    if(outIt == out.end()) {
-                        out.insert(outIt, std::make_pair(label, 1));
-                    } else {
-                        ++outIt->second;
-                    }
-                    ++nPixels;
-                }
-            }
-        }
-        return nPixels;
-    }
-
-
-    template<class LABELS>
-    inline size_t computeHistogramWithIgnoreLabel(const LABELS & labels,
-                                                  const Coordinate2D & blockBegin,
-                                                  const Coordinate2D & blockEnd,
-                                                  Histogram & out,
-                                                  const uint64_t ignoreLabel) {
-        size_t nPixels = 0;
-        for(int64_t x = blockBegin[0]; x < blockEnd[0]; ++x) {
-            for(int64_t y = blockBegin[1]; y < blockEnd[1]; ++y) {
-                //
-                const uint64_t label = labels(x, y);
-                if(label == ignoreLabel) {
-                    continue;
-                }
-
-                auto outIt = out.find(label);
-                if(outIt == out.end()) {
-                    out.insert(outIt, std::make_pair(label, 1));
-                } else {
-                    ++outIt->second;
-                }
-                ++nPixels;
-            }
-        }
-        return nPixels;
-    }
-
-
-    inline double computeSingleAffinity(const Histogram & histo, const Histogram & ngbHisto,
+    inline double compute_single_affinity(const Histogram & histo, const Histogram & ngb_histo,
                                         const double norm) {
         double aff = 0.;
         for(auto it = histo.begin(); it != histo.end(); ++it){
-            auto ngbIt = ngbHisto.find(it->first);
-            if (ngbIt != ngbHisto.end()) {
+            auto ngbIt = ngb_histo.find(it->first);
+            if (ngbIt != ngb_histo.end()) {
                 aff += it->second * ngbIt->second;
             }
         }
@@ -132,223 +72,98 @@ namespace affinities {
     }
 
 
-    inline size_t getBlockIndex(const size_t i, const size_t j, const size_t k,
-                                const Coordinate3D & blockStrides) {
-        return blockStrides[0] * i + blockStrides[1] * j + blockStrides[2] * k;
+    inline size_t get_block_index(const xt::xindex & block_coord,  const xt::xindex & block_strides) {
+        size_t block_id = 0;
+        for(unsigned d = 0; d < block_coord.size(); ++d) {
+            block_id += block_coord[d] * block_strides[d];
+        }
+        return block_id;
     }
 
 
-    inline size_t getBlockIndex(const size_t i, const size_t j,
-                                const Coordinate2D & blockStrides) {
-        return blockStrides[0] * i + blockStrides[1] * j;
-    }
 
+    template<class LABEL, class AFFS, class MASK>
+    void compute_multiscale_affinities(const xt::xexpression<LABEL> & labels_exp,
+                                       const std::vector<int> & block_shape,
+                                       xt::xexpression<AFFS> & affs_exp,
+                                       xt::xexpression<MASK> & mask_exp,
+                                       const bool have_ignore_label=false,
+                                       const uint64_t ignore_label=0) {
 
-    template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
-    void computeMultiscaleAffinities2D(const xt::xexpression<LABEL_ARRAY> & labelsExp,
-                                       const std::vector<int> & blockShape,
-                                       xt::xexpression<AFFS_ARRAY> & affsExp,
-                                       xt::xexpression<MASK_ARRAY> & maskExp,
-                                       const bool haveIgnoreLabel=false,
-                                       const uint64_t ignoreLabel=0) {
+        const auto & labels = labels_exp.derived_cast();
+        auto & affs = affs_exp.derived_cast();
+        auto & mask = mask_exp.derived_cast();
 
-        const auto & labels = labelsExp.derived_cast();
-        auto & affs = affsExp.derived_cast();
-        auto & mask = maskExp.derived_cast();
-
-        //
-        // compute the block sizes and number of blocks
-        //
-        Coordinate2D shape;
-        Coordinate2D blocksPerAxis;
-        for(unsigned d = 0; d < 2; ++d) {
-            blocksPerAxis[d] = affs.shape()[d + 1];
+        // compute the block sizes
+        const unsigned ndim = labels.dimension();
+        xt::xindex shape(ndim), blocks_per_axis(ndim);
+        for(unsigned d = 0; d < ndim; ++d) {
+            blocks_per_axis[d] = affs.shape()[d + 1];
             shape[d] = labels.shape()[d];
         }
-        const size_t numberOfBlocks = std::accumulate(blocksPerAxis.begin(),
-                                                      blocksPerAxis.end(), 1,
-                                                      std::multiplies<size_t>());
-        const Coordinate2D blockStrides = {blocksPerAxis[1], 1};
 
-        //
-        // compute the histograms
-        //
-        HistogramStorage histograms(numberOfBlocks);
-        std::vector<size_t> blockSizes(numberOfBlocks, 1);
-        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
+        // compute the total number of blocks
+        const size_t n_blocks = std::accumulate(blocks_per_axis.begin(), blocks_per_axis.end(), 1,
+                                                std::multiplies<size_t>());
 
-                const size_t blockId = getBlockIndex(i, j, blockStrides);
-                Coordinate2D blockBegin = {i * blockShape[0], j * blockShape[1]};
-                Coordinate2D blockEnd = {std::min((i + 1) * blockShape[0], shape[0]),
-                                         std::min((j + 1) * blockShape[1], shape[1])};
-
-                size_t & blockSize = blockSizes[blockId];
-                if(haveIgnoreLabel){
-                    blockSize = computeHistogramWithIgnoreLabel(labels, blockBegin, blockEnd,
-                                                                histograms[blockId],
-                                                                ignoreLabel);
-                }
-                else {
-                    blockSize = computeHistogram(labels, blockBegin,
-                                                 blockEnd, histograms[blockId]);
-                }
-            }
+        // compute the block strides, e.g. {blocks_per_axis[1] * blocks_per_axis[2], blocks_per_axis[2], 1}
+        // for 3 D
+        xt::xindex block_strides(ndim);
+        for(int d = ndim - 1; d >= 0; --d) {
+            block_strides[d] = (d == ndim - 1) ? 1 : block_strides[d + 1] * blocks_per_axis[d + 1];
         }
 
-        //
+        // compute the histograms for each block
+        HistogramStorage histograms(n_blocks);
+        std::vector<size_t> block_sizes(n_blocks, 1);
+        xt_util::for_each_coordinate(blocks_per_axis, [&](const xt::xindex & block_coord){
+            // get the 1d block index
+            const size_t block_id = get_block_index(block_coord, block_strides);
+            // get the begin and end coordinates of this block
+            xt::xindex block_begin(ndim), block_end(ndim);
+            for(unsigned d = 0; d < ndim; ++d) {
+                block_begin[d] = block_coord[d] * block_shape[d];
+                block_end[d] = std::min((block_coord[d] + 1) * block_shape[d], shape[d]);
+            }
+
+            size_t & block_size = block_sizes[block_id];
+             if(have_ignore_label){
+                 block_size = compute_histogram_with_ignore_label(labels, block_begin, block_end,
+                                                                  histograms[block_id], ignore_label);
+             }
+             else {
+                 block_size = compute_histogram(labels, block_begin, block_end, histograms[block_id]);
+             }
+
+        });
+
         // compute the affinties
-        //
-        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
+        xt_util::for_each_coordinate(blocks_per_axis, [&](const xt::xindex & block_coord){
 
-                const size_t blockId = getBlockIndex(i, j, blockStrides);
-                const auto & histo = histograms[blockId];
-                const size_t blockSize = blockSizes[blockId];
+            const size_t block_id = get_block_index(block_coord, block_strides);
+            const auto & histo = histograms[block_id];
+            const size_t block_size = block_sizes[block_id];
 
-                if(i > 0) {
-                    const size_t ngbId = getBlockIndex(i - 1, j, blockStrides);
-                    const auto & ngbHisto = histograms[ngbId];
-                    const double norm = blockSize * blockSizes[ngbId];
+            xt::xindex aff_coord(ndim + 1);
+            std::copy(block_coord.begin(), block_coord.end(), aff_coord.begin() + 1);
+            for(unsigned d = 0; d < ndim; ++d) {
+                aff_coord[0] = d;
+                if(block_coord[d] > 0) {
+                    xt::xindex ngb_coord = block_coord;
+                    --ngb_coord[d];
+                    const size_t ngb_id = get_block_index(ngb_coord, block_strides);
+                    const auto & ngb_histo = histograms[ngb_id];
+                    const double norm = block_size * block_sizes[ngb_id];
                     if(norm > 0) {
-                        affs(0, i, j) = computeSingleAffinity(histo, ngbHisto, norm);
-                        mask(0, i, j) = 1;
+                        affs[aff_coord] = compute_single_affinity(histo, ngb_histo, norm);
+                        mask[aff_coord] = 1;
                     } else {
-                        mask(0, i, j) = 0;
+                        mask[aff_coord] = 0;
                     }
                 } else {
-                    mask(0, i, j) = 0;
-                }
-
-                if(j > 0) {
-                    const size_t ngbId = getBlockIndex(i, j - 1, blockStrides);
-                    const auto & ngbHisto = histograms[ngbId];
-                    const double norm = blockSize * blockSizes[ngbId];
-                    if(norm > 0) {
-                        affs(1, i, j) = computeSingleAffinity(histo, ngbHisto, norm);
-                        mask(1, i, j) = 1;
-                    } else {
-                        mask(1, i, j) = 0;
-                    }
-                } else {
-                    mask(1, i, j) = 0;
+                    mask[aff_coord] = 0;
                 }
             }
-        }
+        });
     }
-
-
-    template<class LABEL_ARRAY, class AFFS_ARRAY, class MASK_ARRAY>
-    void computeMultiscaleAffinities3D(const xt::xexpression<LABEL_ARRAY> & labelsExp,
-                                       const std::vector<int> & blockShape,
-                                       xt::xexpression<AFFS_ARRAY> & affsExp,
-                                       xt::xexpression<MASK_ARRAY> & maskExp,
-                                       const bool haveIgnoreLabel=false,
-                                       const uint64_t ignoreLabel=0) {
-
-        const auto & labels = labelsExp.derived_cast();
-        auto & affs = affsExp.derived_cast();
-        auto & mask = maskExp.derived_cast();
-
-        //
-        // compute the block sizes and number of blocks
-        //
-        Coordinate3D shape;
-        Coordinate3D blocksPerAxis;
-        for(unsigned d = 0; d < 3; ++d) {
-            blocksPerAxis[d] = affs.shape()[d + 1];
-            shape[d] = labels.shape()[d];
-        }
-        const size_t numberOfBlocks = std::accumulate(blocksPerAxis.begin(),
-                                                      blocksPerAxis.end(), 1,
-                                                      std::multiplies<size_t>());
-        const Coordinate3D blockStrides = {blocksPerAxis[1] * blocksPerAxis[2],
-                                         blocksPerAxis[2], 1};
-
-        //
-        // compute the histograms
-        //
-        HistogramStorage histograms(numberOfBlocks);
-        std::vector<size_t> blockSizes(numberOfBlocks, 1);
-        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
-                for(int64_t k = 0; k < blocksPerAxis[2]; ++k) {
-                    const size_t blockId = getBlockIndex(i, j, k, blockStrides);
-                    Coordinate3D blockBegin = {i * blockShape[0],
-                                             j * blockShape[1],
-                                             k * blockShape[2]};
-                    Coordinate3D blockEnd = {std::min((i + 1) * blockShape[0], shape[0]),
-                                           std::min((j + 1) * blockShape[1], shape[1]),
-                                           std::min((k + 1) * blockShape[2], shape[2])};
-
-                    size_t & blockSize = blockSizes[blockId];
-                    if(haveIgnoreLabel){
-                        blockSize = computeHistogramWithIgnoreLabel(labels, blockBegin, blockEnd,
-                                                                    histograms[blockId], ignoreLabel);
-                    }
-                    else {
-                        blockSize = computeHistogram(labels, blockBegin, blockEnd, histograms[blockId]);
-                    }
-                }
-            }
-        }
-
-        //
-        // compute the affinties
-        //
-        for(int64_t i = 0; i < blocksPerAxis[0]; ++i) {
-            for(int64_t j = 0; j < blocksPerAxis[1]; ++j) {
-                for(int64_t k = 0; k < blocksPerAxis[2]; ++k) {
-
-                    const size_t blockId = getBlockIndex(i, j, k, blockStrides);
-                    const auto & histo = histograms[blockId];
-                    const size_t blockSize = blockSizes[blockId];
-
-                    if(i > 0) {
-                        const size_t ngbId = getBlockIndex(i - 1, j, k, blockStrides);
-                        const auto & ngbHisto = histograms[ngbId];
-                        const double norm = blockSize * blockSizes[ngbId];
-                        if(norm > 0) {
-                            affs(0, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
-                            mask(0, i, j, k) = 1;
-                        } else {
-                            mask(0, i, j, k) = 0;
-                        }
-                    } else {
-                        mask(0, i, j, k) = 0;
-                    }
-
-                    if(j > 0) {
-                        const size_t ngbId = getBlockIndex(i, j - 1, k, blockStrides);
-                        const auto & ngbHisto = histograms[ngbId];
-                        const double norm = blockSize * blockSizes[ngbId];
-                        if(norm > 0) {
-                            affs(1, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
-                            mask(1, i, j, k) = 1;
-                        } else {
-                            mask(1, i, j, k) = 0;
-                        }
-                    } else {
-                        mask(1, i, j, k) = 0;
-                    }
-
-                    if(k > 0) {
-                        const size_t ngbId = getBlockIndex(i, j, k - 1, blockStrides);
-                        const auto & ngbHisto = histograms[ngbId];
-                        const double norm =  blockSize * blockSizes[ngbId];
-                        if(norm > 0) {
-                            affs(2, i, j, k) = computeSingleAffinity(histo, ngbHisto, norm);
-                            mask(2, i, j, k) = 1;
-                        } else {
-                            mask(2, i, j, k) = 0;
-                        }
-                    } else {
-                        mask(2, i, j, k) = 0;
-                    }
-
-                }
-            }
-        }
-    }
-
 }

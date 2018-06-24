@@ -10,76 +10,22 @@
 
 namespace affinities {
 
-
-    template<class GT, class OVERLAPS, class SEGMENT_SIZES, class UFD>
-    inline void initMalis2d(const xt::xexpression<GT> & gtExp,
-                            OVERLAPS & overlaps,
-                            SEGMENT_SIZES & segmentSizes,
-                            UFD & sets,
-                            size_t & nNodesLabeled,
-                            size_t & nPairPos) {
-        const auto & gt = gtExp.derived_cast();
-        size_t nodeIndex = 0;
-
-        const auto & shape = gt.shape();
-        for(int64_t i = 0; i < shape[0]; ++i) {
-            for(int64_t j = 0; j < shape[1]; ++j) {
-                const auto gtId = gt(i, j);
-                if(gtId != 0) {
-                    overlaps[nodeIndex].insert(std::make_pair(gtId, 1));
-                    ++segmentSizes[gtId];
-                    ++nNodesLabeled;
-                    nPairPos += (segmentSizes[gtId] - 1);
-                }
-                ++nodeIndex;
-            }
-        }
-    }
-
-
-    template<class GT, class OVERLAPS, class SEGMENT_SIZES, class UFD>
-    inline void initMalis3d(const xt::xexpression<GT> & gtExp,
-                            OVERLAPS & overlaps,
-                            SEGMENT_SIZES & segmentSizes,
-                            UFD & sets,
-                            size_t & nNodesLabeled,
-                            size_t & nPairPos) {
-        const auto & gt = gtExp.derived_cast();
-        size_t nodeIndex = 0;
-
-        const auto & shape = gt.shape();
-        for(int64_t i = 0; i < shape[0]; ++i) {
-            for(int64_t j = 0; j < shape[1]; ++j) {
-                for(int64_t k = 0; k < shape[2]; ++k) {
-                    const auto gtId = gt(i, j, k);
-                    if(gtId != 0) {
-                        overlaps[nodeIndex].insert(std::make_pair(gtId, 1));
-                        ++segmentSizes[gtId];
-                        ++nNodesLabeled;
-                        nPairPos += (segmentSizes[gtId] - 1);
-                    }
-                    ++nodeIndex;
-                }
-            }
-        }
-    }
-
     template<class AFFS, class GT, class GRADS>
-    double malis_gradient(const xt::xexpression<AFFS> & affinitiesExp,
-                          const xt::xexpression<GT> & gtExp,
-                          xt::xexpression<GRADS> & gradientsExp,
+    double malis_gradient(const xt::xexpression<AFFS> & affs_exp,
+                          const xt::xexpression<GT> & gt_exp,
+                          xt::xexpression<GRADS> & grads_exp,
                           const std::vector<std::vector<int>> & offsets,
                           const bool pos) {
-        const auto & affs = affinitiesExp.derived_cast();
-        const auto & gt = gtExp.derived_cast();
-        auto & grads = gradientsExp.derived_cast();
+        const auto & affs = affs_exp.derived_cast();
+        const auto & gt = gt_exp.derived_cast();
+        auto & grads = grads_exp.derived_cast();
 
         typedef typename GT::value_type LabelType;
         typedef typename AFFS::value_type AffType;
         typedef typename GRADS::value_type GradType;
         // TODO check shapes
         const auto & shape = gt.shape();
-        const auto & gtStrides = gt.strides();
+        const auto & gt_strides = gt.strides();
         const unsigned nDim = gt.dimension();
 
         // nodes and edges in the affinity graph
@@ -97,12 +43,17 @@ namespace affinities {
         std::unordered_map<LabelType, size_t> segmentSizes;
 
         // initialize sets, overlaps and find labeled pixels
-        size_t nNodesLabeled = 0, nPairPos = 0;
-        if(nDim == 2) {
-            initMalis2d(gt, overlaps, segmentSizes, sets, nNodesLabeled, nPairPos);
-        } else {
-            initMalis3d(gt, overlaps, segmentSizes, sets, nNodesLabeled, nPairPos);
-        }
+        size_t nNodesLabeled = 0, nPairPos = 0, nodeIndex = 0;
+        xt_util::for_each_coordinate(shape, [&](const xt::xindex & coord){
+            const auto gtId = gt[coord];
+            if(gtId != 0) {
+                overlaps[nodeIndex].insert(std::make_pair(gtId, 1));
+                ++segmentSizes[gtId];
+                ++nNodesLabeled;
+                nPairPos += (segmentSizes[gtId] - 1);
+            }
+            ++nodeIndex;
+        });
 
         // compute normalisation
         const size_t nPairNorm = pos ? nPairPos : nNodesLabeled * (nNodesLabeled - 1) / 2 - nPairPos;
@@ -157,8 +108,8 @@ namespace affinities {
             // get the spatial node index
             LabelType nodeU = 0, nodeV = 0;
             for(unsigned d = 0; d < nDim; ++d) {
-                nodeU += gtCoordU[d] * gtStrides[d];
-                nodeV += gtCoordV[d] * gtStrides[d];
+                nodeU += gtCoordU[d] * gt_strides[d];
+                nodeV += gtCoordV[d] * gt_strides[d];
             }
 
             // get the representatives of the nodes

@@ -48,7 +48,8 @@ ext_modules = [
             get_numpy_include(),
             os.path.join(sys.prefix, 'include'),
             os.path.join(sys.prefix, 'Library', 'include'),
-            'include'
+            'include',
+            'external/xt_util/include'
         ],
         language='c++'
     ),

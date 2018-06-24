@@ -1,5 +1,5 @@
 #include "xtensor/xtensor.hpp"
-#include "affinities/util.hxx"
+#include "xt_util/xt_util.hxx"
 
 
 namespace affinities {
@@ -68,7 +68,7 @@ namespace affinities {
         xt::xindex shape(labels.shape().begin(), labels.shape().end());
         // iterate over the nodes (pixels), run bfs for each node
         // to label all connected nodes
-        util::forEachCoordinate(shape, [&](const xt::xindex & coord){
+        xt_util::for_each_coordinate(shape, [&](const xt::xindex & coord){
             // don't do anything if this label is already labeled
             if(labels[coord] != 0) {
                 return;
