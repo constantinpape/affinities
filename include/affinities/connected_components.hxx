@@ -15,56 +15,57 @@ namespace affinities {
     // [0, -1, 0]
     // [0, 0, -1]
     template<class AFFS, class LABELS>
-    inline void bfs(const xt::xexpression<AFFS> & affinitiesExp,
-                    xt::xexpression<LABELS> & labelsExp,
+    inline void bfs(const xt::xexpression<AFFS> & affinities_exp,
+                    xt::xexpression<LABELS> & labels_exp,
                     const xt::xindex & coord,
                     const typename LABELS::value_type current_label,
                     const float threshold) {
-        const auto & affs = affinitiesExp.derived_cast();
-        auto & labels = labelsExp.derived_cast();
+        const auto & affs = affinities_exp.derived_cast();
+        auto & labels = labels_exp.derived_cast();
         // label the current pixel
         labels[coord] = current_label;
 
-        const unsigned dim = labels.size();
+        const auto & shape = labels.shape();
+        const unsigned dim = shape.size();
         // initialise the affinity coordinate at the current pixel position
-        xt::xindex affCoord(affs.dimension());
-        std::copy(coord.begin(), coord.end(), affCoord.begin() + 1);
+        xt::xindex aff_coord(affs.dimension());
+        std::copy(coord.begin(), coord.end(), aff_coord.begin() + 1);
         // iterate over the adjacent pixels
         for(unsigned d = 0; d < dim; ++d) {
             // get the affinity of the edge to
             // this adjacent pixel
-            affCoord[0] = d;
-            const auto aff = affs[affCoord];
+            aff_coord[0] = d;
+            const auto aff = affs[aff_coord];
             // check whether the pixels are connected
             // according to the threshold TODO < or >
             if(aff < threshold) {
                 continue;  // continue if not connected
             }
             // get the coordinate of adjacent pixel
-            xt::xindex nextCoord = coord;
-            --nextCoord[d];
+            xt::xindex next_coord = coord;
+            --next_coord[d];
             // check if the pixel is out of range
-            if(nextCoord[d] < 0) {
+            if(next_coord[d] < 0 || next_coord[d] > shape[d]) {
                 continue;  // continue if out of range
             }
             // continue bfs from adjacent node
-            bfs(affs, labels, nextCoord, current_label, threshold);
+            bfs(affs, labels, next_coord, current_label, threshold);
         }
     }
 
 
     // compute connected components based on affinities
     template<class AFFS, class LABELS>
-    inline size_t connected_components(const xt::xexpression<AFFS> & affinitiesExp,
-                                       xt::xexpression<LABELS> & labelsExp,
+    inline size_t connected_components(const xt::xexpression<AFFS> & affinities_exp,
+                                       xt::xexpression<LABELS> & labels_exp,
                                        const float threshold){
         //
         typedef typename LABELS::value_type LabelType;
-        const auto affs = affinitiesExp.derived_cast();
-        auto & labels = labelsExp.derived_cast();
+        const auto affs = affinities_exp.derived_cast();
+        auto & labels = labels_exp.derived_cast();
 
         //
-        LabelType currentLabel = 1;
+        LabelType current_label = 1;
         xt::xindex shape(labels.shape().begin(), labels.shape().end());
         // iterate over the nodes (pixels), run bfs for each node
         // to label all connected nodes
@@ -75,13 +76,13 @@ namespace affinities {
             }
 
             // run bfs beginning from the current node (pixel)
-            bfs(affs, labels, coord, currentLabel, threshold);
+            bfs(affs, labels, coord, current_label, threshold);
             // increase the label
-            ++currentLabel;
+            ++current_label;
         });
 
         // return the max label
-        return static_cast<size_t>(currentLabel - 1);
+        return static_cast<size_t>(current_label - 1);
     }
 
 }
