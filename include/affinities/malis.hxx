@@ -168,4 +168,84 @@ namespace affinities {
     }
 
 
+    // for constrained malis, we compute the gradients in 2 passes:
+    // in the positive pass, ...
+    // in the negative pass, ...
+    template<class AFFS, class GT, class GRADS>
+    double constrained_malis(const xt::xexpression<AFFS> & affs_exp,
+                             const xt::xexpression<GT> & gt_exp,
+                             xt::xexpression<GRADS> & grads_exp,
+                             const std::vector<std::vector<int>> & offsets) {
+        typedef typename AFFS::value_type AffType;
+        typedef typename GT::value_type LabelType;
+
+        const auto & affs = affs_exp.derived_cast();
+        const auto & gt = gt_exp.derived_cast();
+        auto & grads = grads_exp.derived_cast();
+
+        const auto & shape = gt.shape();
+        const unsigned ndim = shape.size();
+        // init affinities for the positive and negative pass
+        const auto & aff_shape = affs.shape();
+        typedef typename xt::xarray<AffType>::shape_type ShapeType;
+        ShapeType out_shape(aff_shape.begin(), aff_shape.end());
+        xt::xarray<AffType> affs_pos(out_shape);
+        xt::xarray<AffType> affs_neg(out_shape);
+
+        // initialize spatial coordinates
+        xt::xindex coord_u(ndim), coord_v(ndim);
+
+        // iterate over all affinities and get values for negative and positive pass
+        // positive pass: aff = min(aff, gt_affinity)
+        // negative pass: aff = max(aff, gt_affinity)
+        // we can compute the gt affinity (which is either 0 or 1, implicitly)
+        xt_util::for_each_coordinate(aff_shape, [&](const xt::xindex & aff_coord){
+            const auto aff = affs[aff_coord];
+            const auto & offset = offsets[aff_coord[0]];
+
+            // get the spatial coordinates
+            // range check
+            bool inRange = true;
+            for(unsigned d = 0; d < ndim; ++d) {
+                coord_u[d] = aff_coord[d + 1];
+                coord_v[d] = aff_coord[d + 1] + offset[d];
+                if(coord_v[d] < 0 || coord_v[d] >= shape[d]) {
+                    inRange = false;
+                    break;
+                }
+            }
+
+            if(!inRange) {
+                return;
+            }
+
+            const LabelType l_u = gt[coord_u];
+            const LabelType l_v = gt[coord_v];
+
+            // check whether this is a connecting or separating
+            // affinity edge
+            if(l_u != l_v || l_u == 0 || l_v == 0) {
+                // seperating (or ignore) edge -> gt affinity is 0
+                // -> aff_pos = min(aff, gt_aff) = 0
+                affs_pos[aff_coord] = 0.;
+                affs_neg[aff_coord] = aff;
+            } else {
+                // connecting edge -> gt affinity is 1
+                // -> aff_neg = max(aff, gt_aff) = 1
+                affs_pos[aff_coord] = aff;
+                affs_neg[aff_coord] = 1.;
+            }
+
+        });
+
+        // run positive and negative pass
+        const double loss_pos = malis_gradient(affs_pos, gt, grads, offsets, true);
+        const double loss_neg = malis_gradient(affs_neg, gt, grads, offsets, false);
+
+        // normalize and invert the gradients
+        grads /= -2.;
+
+        return - (loss_pos + loss_neg) / 2.;
+    }
+
 }

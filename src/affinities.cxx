@@ -93,7 +93,6 @@ PYBIND11_MODULE(affinities, m)
 
 
     // FIXME weird xtensor error prevents nd impl
-    // TODO use constrained malis once implemented
     m.def("compute_malis_2d", [](const xt::pytensor<float, 3> & affinities,
                                  const xt::pytensor<uint64_t, 2> & labels,
                                  const std::vector<std::vector<int>> & offsets) {
@@ -103,8 +102,23 @@ PYBIND11_MODULE(affinities, m)
         xt::pytensor<float, 3> gradients(affShape);
         {
             py::gil_scoped_release allowThreads;
-            loss = affinities::malis_gradient(affinities, labels,
-                                              gradients, offsets, true);
+            loss = affinities::constrained_malis(affinities, labels, gradients, offsets);
+        }
+        return std::make_pair(loss, gradients);
+    }, py::arg("affinities"),
+       py::arg("labels"),
+       py::arg("offsets"));
+
+    m.def("compute_malis_3d", [](const xt::pytensor<float, 4> & affinities,
+                                 const xt::pytensor<uint64_t, 3> & labels,
+                                 const std::vector<std::vector<int>> & offsets) {
+        //
+        const auto & affShape = affinities.shape();
+        double loss;
+        xt::pytensor<float, 4> gradients(affShape);
+        {
+            py::gil_scoped_release allowThreads;
+            loss = affinities::constrained_malis(affinities, labels, gradients, offsets);
         }
         return std::make_pair(loss, gradients);
     }, py::arg("affinities"),
